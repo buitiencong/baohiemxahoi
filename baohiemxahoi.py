@@ -18,7 +18,8 @@ browser = None
 delete_buttons = []
 dang_xoa_hs_trung = False
 dong_test_hien_tai = None  # lưu dòng hiện tại khi test
-
+dang_xoa_hs_7980 = False
+dong_hien_tai_7980 = None  # Dòng hiện tại để duyệt danh sách 7980
 
 
 # --- Hàm khởi động Chrome và điền thông tin tự động ---
@@ -290,92 +291,6 @@ def chon_file_excel():
         dong_test_hien_tai = None  # Reset dòng test
         ghi_log(f"📂 Đã chọn file: {file_path}")
 
-
-
-
-# --- Hàm lấy danh hồ sơ 7980--- Hàm này chưa sửa
-def lay_danh_sach_ho_so_7980():
-    global browser, delete_buttons_7980
-    if browser is None:
-        status_label.config(text="⚠️ Bạn cần mở trình duyệt trước!", fg="orange")
-        return
-
-    try:
-        rows = browser.find_elements(By.XPATH, "//tr[starts-with(@id, 'gvDanhSachBHYT7980_DXDataRow')]")
-        data_list = []
-        delete_buttons_7980 = []  # reset
-
-        for row in rows:
-            cols = row.find_elements(By.TAG_NAME, "td")
-            if len(cols) >= 19:
-                ma_the = cols[3].text.strip()
-                ho_ten = cols[5].text.strip()
-                ngay_vao = cols[8].text.strip()
-                ngay_ra = cols[9].text.strip()
-                try:
-                    # Tìm nút xoá trong cột 18
-                    delete_btn = cols[18].find_element(By.TAG_NAME, "input")
-                except:
-                    delete_btn = None
-
-                if ho_ten and delete_btn:
-                    data_list.append((ma_the, ho_ten, ngay_vao, ngay_ra))
-                    delete_buttons_7980.append((ho_ten, delete_btn))
-
-        text_box.config(state='normal')
-        text_box.delete("1.0", tk.END)
-        for i, (ma_the, ho_ten, ngay_vao, ngay_ra) in enumerate(data_list, 1):
-            text_box.insert(tk.END, f"{i}. Mã thẻ: {ma_the} | Họ tên: {ho_ten} | Vào: {ngay_vao} | Ra: {ngay_ra}\n")
-        text_box.config(state='disabled')
-
-        status_label.config(text=f"✅ Đã lấy được {len(data_list)} hồ sơ 79/80", fg="blue")
-
-    except Exception as e:
-        status_label.config(text=f"❌ Lỗi khi lấy hồ sơ 79/80: {e}", fg="red")
-
-
-
-
-def xoa_danh_sach_ho_so_7980():
-    global delete_buttons_7980
-
-    if not delete_buttons_7980:
-        status_label.config(text="⚠️ Chưa có dữ liệu để xóa. Vui lòng bấm 'Load hồ sơ 79/80' trước.", fg="orange")
-        return
-
-    def xoa_tung_dong(i):
-        if i >= len(delete_buttons_7980):
-            mbox.showinfo("Hoàn thành", "✅ Đã xóa hết tất cả các hồ sơ 79/80.")
-            status_label.config(text="✅ Đã xóa xong toàn bộ hồ sơ 79/80", fg="green")
-            return
-
-        ho_ten, icon = delete_buttons_7980[i]
-
-        try:
-            # Click vào nút xóa
-            browser.execute_script("arguments[0].click();", icon)
-            status_label.config(text=f"🗑️ Đã xóa hồ sơ: {ho_ten}", fg="red")
-
-            # Chờ popup xuất hiện (tối đa 5 giây)
-            WebDriverWait(browser, 5).until(
-                EC.visibility_of_element_located((By.ID, "PopupThongBaoXoa_PWH-1"))
-            )
-
-            # Click vào nút "Không" trong popup
-            btn_khong = WebDriverWait(browser, 3).until(
-                EC.element_to_be_clickable((By.ID, "btnKhong_CD"))
-            )
-            btn_khong.click()
-
-        except Exception as e:
-            status_label.config(text=f"❌ Lỗi khi xử lý {ho_ten}: {e}", fg="red")
-
-        # Tiếp tục xử lý dòng tiếp theo sau một chút delay
-        root.after(600, lambda: xoa_tung_dong(i + 1))
-
-    xoa_tung_dong(0)
-
-
 # Test file excel
 def test_in_thong_tin_excel():
     global dong_test_hien_tai
@@ -425,6 +340,173 @@ def test_in_thong_tin_excel():
         ghi_log(f"❌ Lỗi khi đọc dòng {dong_test_hien_tai}: {e}")
 
     dong_test_hien_tai += 1
+
+
+# Duyệt qua danh sách excel, tìm kiếm, so sánh và xóa hồ sơ 7980
+def xoa_ho_so_7980():
+    global dong_hien_tai, dang_xoa_hs_7980
+
+    if not dang_xoa_hs_7980:
+        # Bắt đầu tiến trình xoá
+        btn_delete_hs_7980.config(text="⏹️ Dừng xóa")
+        ghi_log("🚀 Bắt đầu xoá hồ sơ 79/80...")
+        dong_hien_tai = None
+        dang_xoa_hs_7980 = True
+        xoa_tiep_dong_7980()
+    else:
+        # Dừng tiến trình xoá
+        dang_xoa_hs_7980 = False
+        btn_delete_hs_7980.config(text="Xóa HS 79/80")
+        ghi_log("⏹️ Đã dừng xoá theo yêu cầu.")
+
+def xoa_tiep_dong_7980():
+    global dong_hien_tai, dang_xoa_hs_7980
+
+    if not dang_xoa_hs_7980:
+        return
+
+    # --- Đọc dữ liệu từ file Excel ---
+    file_path = entry_file_path.get().strip()
+    if not file_path:
+        ghi_log("❌ Chưa chọn file Excel.")
+        return
+
+    try:
+        wb = openpyxl.load_workbook(file_path)
+        ws = wb.active
+    except Exception as e:
+        ghi_log(f"❌ Lỗi khi mở file Excel: {e}")
+        return
+
+    try:
+        start = int(entry_start.get().strip())
+        end = int(entry_end.get().strip())
+    except ValueError:
+        ghi_log("⚠️ Vui lòng nhập số nguyên cho dòng bắt đầu và kết thúc.")
+        return
+
+    if dong_hien_tai is None:
+        dong_hien_tai = start
+
+    if dong_hien_tai > end:
+        ghi_log("✅ Đã duyệt hết tất cả các dòng.")
+        btn_delete_hs_7980.config(text="Xóa HS 79/80")
+        dang_xoa_hs_7980 = False
+        return
+
+    try:
+        # --- Lấy dữ liệu từ dòng hiện tại ---
+        ma_the_col = combo_mt.get().strip().upper()
+        ho_ten_col = combo_ht.get().strip().upper()
+        ngay_vao_col = combo_nv.get().strip().upper()
+        ngay_ra_col = combo_nr.get().strip().upper()
+
+        ma_the_val = ws[f"{ma_the_col}{dong_hien_tai}"].value
+        ho_ten_val = str(ws[f"{ho_ten_col}{dong_hien_tai}"].value).strip()
+        ngay_vao_val = str(ws[f"{ngay_vao_col}{dong_hien_tai}"].value).strip()
+        ngay_ra_val = str(ws[f"{ngay_ra_col}{dong_hien_tai}"].value).strip()
+
+        if not ma_the_val:
+            ghi_log(f"{dong_hien_tai}: ⚠️ Không có mã thẻ. Bỏ qua.")
+            dong_hien_tai += 1
+            root.after(500, xoa_tiep_dong_7980)
+            return
+
+        # --- Tìm lại input mỗi lần để tránh stale element ---
+        input_box = WebDriverWait(browser, 5).until(
+            EC.presence_of_element_located((By.ID, "gvDanhSachBHYT7980_DXFREditorcol3_I"))
+        )
+
+        # --- Xóa dữ liệu cũ trong input mã thẻ ---
+        input_box.clear()
+
+        # --- Chờ loading sau khi clear input ---
+        try:
+            WebDriverWait(browser, 5).until_not(
+                EC.presence_of_element_located((By.CLASS_NAME, "dxgvLoadingDiv_EIS"))
+            )
+        except:
+            pass
+
+        # --- Tìm lại input box lần nữa trước khi nhập mã thẻ ---
+        input_box = WebDriverWait(browser, 5).until(
+            EC.presence_of_element_located((By.ID, "gvDanhSachBHYT7980_DXFREditorcol3_I"))
+        )
+        input_box.send_keys(str(ma_the_val))
+
+        # --- Chờ loading sau khi nhập mã thẻ ---
+        try:
+            WebDriverWait(browser, 5).until_not(
+                EC.presence_of_element_located((By.CLASS_NAME, "dxgvLoadingDiv_EIS"))
+            )
+        except:
+            pass
+
+        # --- Tìm danh sách kết quả ---
+        rows = browser.find_elements(By.XPATH, "//tr[starts-with(@id, 'gvDanhSachBHYT7980_DXDataRow')]")
+        found = False
+
+        for row in rows:
+            cols = row.find_elements(By.TAG_NAME, "td")
+            if len(cols) >= 19:
+                ho_ten = cols[5].text.strip()
+                ngay_vao = cols[8].text.strip().replace(" SA", "").replace(" CH", "")
+                ngay_ra = cols[9].text.strip().replace(" SA", "").replace(" CH", "")
+
+                if ho_ten == ho_ten_val and ngay_vao == ngay_vao_val and ngay_ra == ngay_ra_val:
+                    try:
+                        # 🔄 Tìm lại cột trước khi bấm xoá
+                        cols = row.find_elements(By.TAG_NAME, "td")
+                        delete_btn = cols[18].find_element(By.TAG_NAME, "input")
+
+                        browser.execute_script("arguments[0].click();", delete_btn)
+
+                        # ⏳ Chờ popup xác nhận xóa hiện ra
+                        WebDriverWait(browser, 5).until(
+                            EC.visibility_of_element_located((By.ID, "PopupThongBaoXoa_PWH-1"))
+                        )
+
+                        # ✅ Tự động bấm vào nút "Không"
+                        btn_khong = WebDriverWait(browser, 3).until(
+                            EC.element_to_be_clickable((By.ID, "btnKhong_CD"))
+                        )
+                        btn_khong.click()
+
+                        ghi_log(f"{dong_hien_tai}: 🗑️ Đã xoá: {ho_ten}")
+                        found = True
+                        break
+                    except Exception as e:
+                        ghi_log(f"{dong_hien_tai}: ❌ Không thể xoá: {e}")
+
+        if not found:
+            ghi_log(f"{dong_hien_tai}: ❌ Không tìm thấy hồ sơ phù hợp để xoá.")
+
+    except Exception as e:
+        ghi_log(f"{dong_hien_tai}: ❌ Lỗi: {e}")
+
+    dong_hien_tai += 1
+    root.after(700, xoa_tiep_dong_7980)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -528,7 +610,7 @@ btn_test_range = tk.Button(row_range_frame, text="Test", command=test_in_thong_t
 btn_test_range.pack(side="left", padx=5)
 
 
-btn_delete_hs_7980 = tk.Button(right_column, text="Xóa HS 79/80", font=("Arial", 12), command=xoa_danh_sach_ho_so_7980)
+btn_delete_hs_7980 = tk.Button(right_column, text="Xóa HS 79/80", font=("Arial", 12), command=xoa_ho_so_7980)
 btn_delete_hs_7980.pack(pady=5)
 
 # --- Status và Text Box ---
