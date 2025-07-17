@@ -1,6 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import ttk
+from tkinter import Toplevel, Label, Entry, Button, messagebox
 import tkinter.messagebox as mbox
 from tkinter import filedialog
 from selenium import webdriver
@@ -16,6 +17,7 @@ import openpyxl
 import re
 import sys
 import os
+import csv
 
 # --- Biến driver toàn cục ---
 browser = None
@@ -31,37 +33,33 @@ ws_excel_7980 = None
 # --- Hàm khởi động Chrome và điền thông tin tự động ---
 def launchBrowser():
     chrome_options = Options()
-    
-    # Tắt các tính năng không cần thiết
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
-    
-    # Tăng tốc khởi động
     chrome_options.add_argument("--disable-background-timer-throttling")
     chrome_options.add_argument("--disable-backgrounding-occluded-windows")
     chrome_options.add_argument("--disable-renderer-backgrounding")
+
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
     browser.get("https://gdbhyt.baohiemxahoi.gov.vn/")
-    
+
+    # ✅ Lấy thông tin từ file login.csv
+    ma_cs, username, password = doc_thong_tin_dang_nhap()
+
     try:
-        # Đợi và nhập vào trường "macskcb"
         WebDriverWait(browser, 15).until(
             EC.presence_of_element_located((By.ID, "macskcb"))
-        ).send_keys("01820")
+        ).send_keys(ma_cs)
 
-        # Nhập vào "username"
         WebDriverWait(browser, 10).until(
             EC.presence_of_element_located((By.ID, "username"))
-        ).send_keys("001194021054")
+        ).send_keys(username)
 
-        # Nhập vào "password"
         WebDriverWait(browser, 10).until(
             EC.presence_of_element_located((By.ID, "password"))
-        ).send_keys("Donggiahuy@123")
+        ).send_keys(password)
 
-        # ✅ Focus vào ô Captcha (dòng bạn cần)
         WebDriverWait(browser, 5).until(
             EC.presence_of_element_located((By.ID, "Captcha_TB_I"))
         )
@@ -69,8 +67,34 @@ def launchBrowser():
 
     except TimeoutException:
         print("Không tìm thấy đủ các trường nhập sau 15 giây.")
-    
+
     return browser
+
+
+# Đọc thông tin từ file csv
+def doc_thong_tin_dang_nhap():
+    filepath = get_login_file_path()
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                return (
+                    row.get("ma_co_so", ""),
+                    row.get("ten_dang_nhap", ""),
+                    row.get("mat_khau", "")
+                )
+    return "", "", ""
+
+
+# Hàm để tìm đường dẫn file login.csv tránh trường hợp báo lỗi khi chạy file exe
+def get_login_file_path():
+    import sys
+    if getattr(sys, 'frozen', False):
+        return os.path.join(os.path.dirname(sys.executable), "login.csv")
+    else:
+        return os.path.join(os.path.abspath("."), "login.csv")
+
+
 
 
 # --- Giao diện GUI ---
@@ -85,7 +109,6 @@ root.iconbitmap(resource_path("icon.ico"))
 
 root.title("Tự động xóa cổng bảo hiểm")
 root.geometry("450x700")
-
 
 
 
@@ -158,17 +181,59 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
                 EC.element_to_be_clickable((By.ID, item_id))
             ).click()
 
+
+
+        # # 4. Chọn tháng từ Combobox giao diện người dùng
+        # thang_chon = combo_thang.get()                     # Ví dụ: "Tháng 7"
+        # so_thang = int(thang_chon.split()[-1])             # Lấy số 7
+        # index_thang = so_thang - 1                         # Index = 6
+
+        # WebDriverWait(browser, 10).until(
+        #     EC.element_to_be_clickable((By.ID, "cbx_thang_I"))
+        # ).click()
+        # WebDriverWait(browser, 5).until(
+        #     EC.element_to_be_clickable((By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0"))
+        # ).click()
+
+
+
         # 4. Chọn tháng từ Combobox giao diện người dùng
         thang_chon = combo_thang.get()                     # Ví dụ: "Tháng 7"
         so_thang = int(thang_chon.split()[-1])             # Lấy số 7
         index_thang = so_thang - 1                         # Index = 6
 
-        WebDriverWait(browser, 10).until(
-            EC.element_to_be_clickable((By.ID, "cbx_thang_I"))
-        ).click()
-        WebDriverWait(browser, 5).until(
-            EC.element_to_be_clickable((By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0"))
-        ).click()
+        # --- Kiểm tra nếu đã chọn đúng tháng ---
+        try:
+            selected_thang = browser.find_element(By.ID, "cbx_thang_I").get_attribute("value")
+            if str(so_thang) in selected_thang:
+                print(f"✅ Tháng {so_thang} đã được chọn sẵn, bỏ qua bước chọn.")
+            else:
+                # Nếu chưa chọn đúng thì mới thực hiện chọn
+                WebDriverWait(browser, 10).until(
+                    EC.element_to_be_clickable((By.ID, "cbx_thang_I"))
+                ).click()
+
+                # Đợi dropdown hiển thị ổn định
+                WebDriverWait(browser, 5).until(
+                    EC.visibility_of_element_located((By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0"))
+                )
+
+                # Thử click vài lần nếu lần đầu không hiệu lực
+                for _ in range(3):
+                    try:
+                        browser.find_element(By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0").click()
+                        break
+                    except Exception:
+                        time.sleep(0.3)
+
+                # Xác nhận lại tháng sau khi chọn (không bắt buộc)
+                selected_again = browser.find_element(By.ID, "cbx_thang_I").get_attribute("value")
+                if str(so_thang) not in selected_again:
+                    print("⚠️ Cảnh báo: Tháng chưa được chọn đúng.")
+        except Exception as e:
+            ghi_log(f"❌ Lỗi khi kiểm tra/chọn tháng: {e}")
+
+
 
         # 5. Bấm nút Tìm kiếm
         WebDriverWait(browser, 10).until(
@@ -254,7 +319,6 @@ def xoa_danh_sach_ho_so_trung():
                 EC.visibility_of_element_located((By.CLASS_NAME, "dxp-summary"))
             )
             summary_text = summary_element.text  # Ví dụ: "Page 1 of 18 (348 items)"
-            import re
             match = re.search(r"\((\d+)\s+items\)", summary_text)
             return int(match.group(1)) if match else 0
         except:
@@ -275,15 +339,12 @@ def xoa_danh_sach_ho_so_trung():
         current_count = dem_so_ho_so_tren_trang()
 
         if current_count == -1:
-            ghi_log("✅ Đã xóa xong, không tìm thấy hồ sơ trùng.")
-            status_label.config(text="✅ Đã xóa xong, không tìm thấy hồ sơ trùng.", fg="green")
-            btn_delete_hs_trung.config(text="Xóa HS Trùng")
-            dang_xoa_hs_trung = False
-            return
+            # Cho phép thử tiếp nếu chỉ mất tạm thời
+            current_count = 0
 
         if current_count == 0:
-            ghi_log("✅ Đã xóa xong toàn bộ hồ sơ trùng.")
-            status_label.config(text="✅ Đã xóa xong toàn bộ hồ sơ trùng.", fg="green")
+            ghi_log("✅ Không tìm thấy hồ sơ trùng.")
+            status_label.config(text="✅ Không tìm thấy hồ sơ trùng.", fg="green")
             btn_delete_hs_trung.config(text="Xóa HS Trùng")
             dang_xoa_hs_trung = False
             return
@@ -307,16 +368,25 @@ def xoa_danh_sach_ho_so_trung():
             btn_co.click()
 
             # Theo dõi số lượng thay đổi
-            import time
+            fail_count = 0
             for _ in range(20):  # tối đa 10s
                 time.sleep(0.5)
                 new_count = dem_so_ho_so_tren_trang()
+
+                print(f"[DEBUG] current_count = {current_count}, new_count = {new_count}")
+
                 if new_count == -1:
-                    ghi_log("✅ Đã xóa xong, không còn bảng kết quả.")
-                    status_label.config(text="✅ Đã xóa xong, không còn bảng kết quả.", fg="green")
-                    btn_delete_hs_trung.config(text="Xóa HS Trùng")
-                    dang_xoa_hs_trung = False
-                    return
+                    fail_count += 1
+                    if fail_count >= 3:
+                        ghi_log("⚠️ Không tìm thấy bảng kết quả sau nhiều lần. Dừng lại.")
+                        status_label.config(text="⚠️ Không tìm thấy bảng kết quả sau nhiều lần.", fg="red")
+                        btn_delete_hs_trung.config(text="Xóa HS Trùng")
+                        dang_xoa_hs_trung = False
+                        return
+                    continue  # thử lại
+
+                fail_count = 0  # reset nếu bình thường
+
                 if new_count < current_count:
                     print(f"[DEBUG] Hồ sơ giảm từ {current_count} → {new_count}")
                     # Đóng popup nếu có
@@ -345,6 +415,7 @@ def xoa_danh_sach_ho_so_trung():
         root.after(500, xoa_tiep)
 
     xoa_tiep()
+
 
 
 
@@ -654,6 +725,86 @@ def xoa_tiep_dong_7980():
 
 
 
+# Cửa sổ Cài đặt: Đã giải quyết vấn đề hiển thị chính giữa cửa sổ cha và không bị nháy 2 lần
+def mo_cai_dat():
+    # --- Tính toán vị trí trước ---
+    w, h = 300, 250
+    root.update_idletasks()
+    root_x = root.winfo_rootx()
+    root_y = root.winfo_rooty()
+    root_w = root.winfo_width()
+    root_h = root.winfo_height()
+    x = root_x + (root_w // 2) - (w // 2)
+    y = root_y + (root_h // 2) - (h // 2)
+
+    # --- Dùng after để tránh nháy ---
+    def tao_cua_so():
+        win = tk.Toplevel()
+        win.withdraw()  # ✅ Ẩn ngay sau khi tạo để tránh nháy
+        win.title("Cài đặt đăng nhập")
+        win.iconbitmap(resource_path("icon.ico"))  # ✅ Icon cửa sổ
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        win.resizable(False, False)
+        win.transient(root)
+        win.grab_set()
+
+        # --- Giao diện ---
+        tk.Label(win, text="Mã cơ sở KCB:", font=("Arial", 10)).pack(pady=(10, 0))
+        entry_ma_cs = tk.Entry(win, font=("Arial", 10), justify="center")
+        entry_ma_cs.pack()
+
+        tk.Label(win, text="Tên đăng nhập:", font=("Arial", 10)).pack(pady=(10, 0))
+        entry_username = tk.Entry(win, font=("Arial", 10), justify="center")
+        entry_username.pack()
+
+        tk.Label(win, text="Mật khẩu:", font=("Arial", 10)).pack(pady=(10, 0))
+        entry_password = tk.Entry(win, font=("Arial", 10), justify="center")
+        entry_password.pack()
+
+        # --- Đọc dữ liệu từ CSV ---
+        filepath = get_login_file_path()
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    entry_ma_cs.insert(0, row.get("ma_co_so", ""))
+                    entry_username.insert(0, row.get("ten_dang_nhap", ""))
+                    entry_password.insert(0, row.get("mat_khau", ""))
+                    break
+
+        # --- Lưu ---
+        def luu():
+            ma_cs = entry_ma_cs.get().strip()
+            username = entry_username.get().strip()
+            password = entry_password.get().strip()
+
+            if not ma_cs or not username or not password:
+                messagebox.showwarning("Thiếu thông tin", "Vui lòng nhập đầy đủ.")
+                return
+
+            with open(filepath, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=["ma_co_so", "ten_dang_nhap", "mat_khau"])
+                writer.writeheader()
+                writer.writerow({
+                    "ma_co_so": ma_cs,
+                    "ten_dang_nhap": username,
+                    "mat_khau": password
+                })
+
+            messagebox.showinfo("Thành công", "Đã lưu.")
+            win.destroy()
+
+        tk.Button(win, text="Lưu", font=("Arial", 10), width=10, command=luu).pack(pady=20)
+        
+        # --- Footer ---
+        tk.Label(win, text="07/2025 - buitiencong@gmail.com", font=("Arial", 8), fg="gray").pack(side="bottom", pady=(5, 5))
+
+        win.deiconify()  # ✅ Hiển thị lại sau khi setup xong
+
+    root.after(1, tao_cua_so)
+
+
+
 
 
 
@@ -682,8 +833,23 @@ def xoa_tiep_dong_7980():
 
 
 # === Đăng nhập + Combobox tháng ===
-btn_login = tk.Button(root, text="Đăng nhập cổng bảo hiểm", font=("Arial", 12), command=mo_chrome)
-btn_login.pack(pady=10)
+# --- Dòng chứa nút Đăng nhập (giữa) và Cài đặt (phải) ---
+top_button_frame = tk.Frame(root)
+top_button_frame.pack(fill="x", pady=10, padx=10)
+
+# Dùng lưới 3 cột: spacer trái - nút đăng nhập - spacer phải
+top_button_frame.columnconfigure(0, weight=1)
+top_button_frame.columnconfigure(1, weight=0)
+top_button_frame.columnconfigure(2, weight=1)
+
+btn_login = tk.Button(top_button_frame, text="Đăng nhập cổng bảo hiểm", font=("Arial", 12), command=mo_chrome)
+btn_login.grid(row=0, column=1)
+
+# Nút "Cài đặt" căn sát phải bằng place
+btn_caidat = tk.Button(top_button_frame, text="⚙️", font=("Arial", 12), command=mo_cai_dat)
+btn_caidat.place(relx=1.0, x=0, y=0, anchor="ne")
+
+
 
 thang_hien_tai = datetime.datetime.now().month
 index_mac_dinh = thang_hien_tai - 1
@@ -720,7 +886,7 @@ frame_buttons.pack(expand=True)
 btn_load_hs_trung = tk.Button(frame_buttons, text="Load hồ sơ trùng", font=("Arial", 12), command=load_ho_so_trung)
 btn_load_hs_trung.pack(pady=10)
 
-btn_delete_hs_trung = tk.Button(frame_buttons, text="Xóa HS Trùng", font=("Arial", 12), command=toggle_xoa_ho_so_trung)
+btn_delete_hs_trung = tk.Button(frame_buttons, text="Xóa hồ sơ trùng", font=("Arial", 12), command=toggle_xoa_ho_so_trung)
 btn_delete_hs_trung.pack(pady=10)
 
 # === Tab 2: Hồ sơ 79/80 ===
@@ -825,7 +991,7 @@ entry_end.pack(side="left", padx=2)
 btn_test_range = tk.Button(row_range_frame, text="Test", command=test_in_thong_tin_excel)
 btn_test_range.pack(side="left", padx=5)
 
-btn_delete_hs_7980 = tk.Button(tab_hs_7980, text="Xóa HS 79/80", font=("Arial", 12), command=xoa_ho_so_7980)
+btn_delete_hs_7980 = tk.Button(tab_hs_7980, text="Xóa hồ sơ 79/80", font=("Arial", 12), command=xoa_ho_so_7980)
 btn_delete_hs_7980.pack(pady=5)
 
 # === Status và TextBox ===
