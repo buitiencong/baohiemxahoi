@@ -22,7 +22,7 @@ import csv
 # --- Biến driver toàn cục ---
 browser = None
 delete_buttons = []
-dang_xoa_hs_trung = False
+dang_xoa_hs_xml = False
 dong_test_hien_tai = None  # lưu dòng hiện tại khi test
 dang_xoa_hs_7980 = False
 dong_hien_tai_7980 = None  # Dòng hiện tại để duyệt danh sách 7980
@@ -151,9 +151,9 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
         return
     
     # 🟦 Thông báo đang xử lý
-    btn_load_hs_trung.config(state="disabled")  # ❌ Tạm vô hiệu hóa nút
+    btn_load_hs_xml.config(state="disabled")  # ❌ Tạm vô hiệu hóa nút
     btn_load_hs_7980.config(state="disabled")  # ❌ Tạm vô hiệu hóa nút
-    status_label.config(text=f"⏳ Đang load danh sách hồ sơ {ten_ho_so}...", fg="blue")
+    status_label.config(text=f"⏳ Đang load danh sách {ten_ho_so}...", fg="blue")
     root.update()  # ✅ Cập nhật giao diện ngay lập tức
 
     try:
@@ -167,10 +167,37 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
             pass  # Không có popup thì bỏ qua
 
         # 2. Click lần lượt các menu theo ID
-        for menu_id in menu_ids:
-            WebDriverWait(browser, 10).until(
-                EC.element_to_be_clickable((By.ID, menu_id))
-            ).click()
+        # for menu_id in menu_ids:
+        #     WebDriverWait(browser, 10).until(
+        #         EC.element_to_be_clickable((By.ID, menu_id))
+        #     ).click()
+        # --- Kiểm tra nếu menu cấp 3 đã được chọn sẵn (dưới dạng <div>) ---
+        menu_id_cap_3 = menu_ids[-1]
+        try:
+            element_cap_3 = WebDriverWait(browser, 5).until(
+                EC.presence_of_element_located((By.ID, menu_id_cap_3))
+            )
+            # Nếu menu cấp 3 đã được chọn thì tải lại trang web để reset biến đếm
+            if element_cap_3.tag_name.lower() == "div":
+                print(f"[INFO] Menu cấp 3 '{menu_id_cap_3}' đã được chọn → tiến hành refresh trang.")
+                browser.refresh()
+
+                # Đợi trang tải xong, phần tử menu cấp 3 đã xuất hiện
+                WebDriverWait(browser, 15).until(
+                    EC.presence_of_element_located((By.ID, menu_id_cap_3)) 
+                )
+
+            else:
+                # --- Nếu chưa được chọn, click lần lượt menu cấp 1 → 3 ---
+                for menu_id in menu_ids:
+                    WebDriverWait(browser, 5).until(
+                        EC.element_to_be_clickable((By.ID, menu_id))
+                    ).click()
+                    time.sleep(0.3)
+        except Exception as e:
+            ghi_log(f"⚠️ Không thể kiểm tra hoặc click menu '{menu_id_cap_3}': {e}")
+
+
 
         # 3. Chọn các giá trị trong combobox lọc
         for combo_id, item_id in combobox_ids:
@@ -180,22 +207,6 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
             WebDriverWait(browser, 5).until(
                 EC.element_to_be_clickable((By.ID, item_id))
             ).click()
-
-
-
-        # # 4. Chọn tháng từ Combobox giao diện người dùng
-        # thang_chon = combo_thang.get()                     # Ví dụ: "Tháng 7"
-        # so_thang = int(thang_chon.split()[-1])             # Lấy số 7
-        # index_thang = so_thang - 1                         # Index = 6
-
-        # WebDriverWait(browser, 10).until(
-        #     EC.element_to_be_clickable((By.ID, "cbx_thang_I"))
-        # ).click()
-        # WebDriverWait(browser, 5).until(
-        #     EC.element_to_be_clickable((By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0"))
-        # ).click()
-
-
 
         # 4. Chọn tháng từ Combobox giao diện người dùng
         thang_chon = combo_thang.get()                     # Ví dụ: "Tháng 7"
@@ -241,6 +252,7 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
         ).click()
 
         # 6. Lấy kết quả tổng số hồ sơ
+        
         try:
             summary_element = WebDriverWait(browser, 15).until(
                 EC.visibility_of_element_located((By.CLASS_NAME, "dxp-summary"))
@@ -254,13 +266,13 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
             globals()[output_var_name] = count
 
             # 8. Ghi log kết quả
-            ghi_log(f"✅ Đã tìm thấy {count} hồ sơ {ten_ho_so}")
-            status_label.config(text=f"✅ Đã tìm thấy {count} hồ sơ {ten_ho_so}", fg="green")
+            ghi_log(f"✅ Đã tìm thấy {count} {ten_ho_so}")
+            status_label.config(text=f"✅ Đã tìm thấy {count} {ten_ho_so}", fg="green")
 
         except TimeoutException:
             ghi_log("❌ Lỗi tải trang, không tìm thấy kết quả sau 15s.")
             status_label.config(text="❌ Lỗi tải trang, không tìm thấy kết quả sau 15s", fg="red")
-            btn_load_hs_trung.config(state="normal")
+            btn_load_hs_xml.config(state="normal")
             btn_load_hs_7980.config(state="normal")
             return
 
@@ -268,24 +280,45 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
         status_label.config(text="❌ Lỗi tải trang", fg="red")
         ghi_log(f"❌ Lỗi tải trang: {e}")
 
-    btn_load_hs_trung.config(state="normal")
+    btn_load_hs_xml.config(state="normal")
     btn_load_hs_7980.config(state="normal")
 
 
 
 
-# Load hồ sơ trùng
-def load_ho_so_trung():
+# Load hồ sơ XML
+def load_ho_so_xml():
     menu_ids = [
-        "HeaderMenu_DXI2_T",         # 🧭 Menu cấp 1: "Hồ sơ đề nghị thanh toán"
-        "HeaderMenu_DXI2i0_T",       # 📄 Menu cấp 2: "Hồ sơ XML"
-        "HeaderMenu_DXI2i0i2_T",     # 📋 Menu cấp 3: "Danh sách đề nghị thanh toán"
+        "HeaderMenu_DXI2_T",
+        "HeaderMenu_DXI2i0_T",
+        "HeaderMenu_DXI2i0i2_T",
     ]
+
+    # ✅ Dựa vào lựa chọn của người dùng
+    "Hồ sơ đúng", "Hồ sơ trùng", "Hồ sơ cảnh báo", "Hồ sơ lỗi dữ liệu", "Hồ sơ giám định trả về", "Hồ sơ thay thế"
+    loai = combo_loai_hs_xml.get()
+    if loai == "Hồ sơ đúng":
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI1T0"
+    elif loai == "Hồ sơ trùng":
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI2T0"
+    elif loai == "Hồ sơ cảnh báo":
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI3T0"
+    elif loai == "Hồ sơ lỗi dữ liệu":
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI4T0"
+    elif loai == "Hồ sơ giám định trả về":
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI5T0"
+    elif loai == "Hồ sơ thay thế":
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI6T0"
+    else:
+        trang_thai_id = "cb_TrangThaiHS_DDD_L_LBI2T0"  # Mặc định là Hồ sơ trùng
+
     combobox_ids = [
-        ("cb_TrangThaiHS_I", "cb_TrangThaiHS_DDD_L_LBI2T0"),  # ✅ Trạng thái hồ sơ: "Hồ sơ trùng"
-        ("cb_TrangThaiTT_I", "cb_TrangThaiTT_DDD_L_LBI0T0"),  # 💰 Trạng thái thanh toán: "Tất cả"
+        ("cb_TrangThaiHS_I", trang_thai_id),
+        ("cb_TrangThaiTT_I", "cb_TrangThaiTT_DDD_L_LBI0T0"),  # Tất cả
     ]
-    lay_danh_sach_ho_so(menu_ids, combobox_ids, "so_ho_so_trung", "trùng")
+
+    lay_danh_sach_ho_so(menu_ids, combobox_ids, "so_ho_so_xml", loai.lower())
+
 
 
 
@@ -300,7 +333,7 @@ def load_ho_so_7980():
         ("cb_TrangThaiHS_I", "cb_TrangThaiHS_DDD_L_LBI0T0"),  # ✅ Trạng thái hồ sơ: "Tất cả"
         ("cb_TrangThaiTT_I", "cb_TrangThaiTT_DDD_L_LBI0T0"),  # 💰 Trạng thái thanh toán: "Tất cả"
     ]
-    lay_danh_sach_ho_so(menu_ids, combobox_ids, "so_ho_so_7980", "79/80")
+    lay_danh_sach_ho_so(menu_ids, combobox_ids, "so_ho_so_7980", "hồ sơ 79/80")
 
 
 
@@ -309,9 +342,10 @@ def load_ho_so_7980():
 
 
 
-# Xóa hồ sơ trùng
-def xoa_danh_sach_ho_so_trung():
-    global dang_xoa_hs_trung
+# Xóa hồ sơ XML
+def xoa_danh_sach_ho_so_xml():
+    global dang_xoa_hs_xml
+    loai_hs_xml_text = combo_loai_hs_xml.get()
 
     def dem_so_ho_so_tren_trang():
         try:
@@ -324,16 +358,16 @@ def xoa_danh_sach_ho_so_trung():
         except:
             return -1  # Không còn thấy phần tử nữa
 
-    if not dang_xoa_hs_trung:
+    if not dang_xoa_hs_xml:
         return
 
     def xoa_tiep():
-        global dang_xoa_hs_trung
+        global dang_xoa_hs_xml
 
-        if not dang_xoa_hs_trung:
+        if not dang_xoa_hs_xml:
             ghi_log("⏹️ Tạm dừng")
             status_label.config(text="⏹️ Tạm dừng", fg="red")
-            btn_delete_hs_trung.config(text="Xóa HS Trùng")
+            btn_delete_hs_xml.config(text=f"Xóa {loai_hs_xml_text.lower()}")
             return
 
         current_count = dem_so_ho_so_tren_trang()
@@ -343,10 +377,10 @@ def xoa_danh_sach_ho_so_trung():
             current_count = 0
 
         if current_count == 0:
-            ghi_log("✅ Không tìm thấy hồ sơ trùng.")
-            status_label.config(text="✅ Không tìm thấy hồ sơ trùng.", fg="green")
-            btn_delete_hs_trung.config(text="Xóa HS Trùng")
-            dang_xoa_hs_trung = False
+            ghi_log(f"✅ Không tìm thấy {loai_hs_xml_text.lower()}")
+            status_label.config(text=f"✅ Không tìm thấy {loai_hs_xml_text.lower()}", fg="green")
+            btn_delete_hs_xml.config(text=f"Xóa {loai_hs_xml_text.lower()}")
+            dang_xoa_hs_xml = False
             return
 
         try:
@@ -375,19 +409,20 @@ def xoa_danh_sach_ho_so_trung():
 
                 print(f"[DEBUG] current_count = {current_count}, new_count = {new_count}")
 
-                if new_count == -1:
+                if new_count == -1: # Không tìm thấy bảng kết quả (đã xóa xong)
                     fail_count += 1
                     if fail_count >= 3:
-                        ghi_log("⚠️ Không tìm thấy bảng kết quả sau nhiều lần. Dừng lại.")
-                        status_label.config(text="⚠️ Không tìm thấy bảng kết quả sau nhiều lần.", fg="red")
-                        btn_delete_hs_trung.config(text="Xóa HS Trùng")
-                        dang_xoa_hs_trung = False
+                        ghi_log(f"⚠️ Không tìm thấy {loai_hs_xml_text.lower()}. Dừng lại.")
+                        messagebox.showinfo("Hoàn tất", f"✅ Không tìm thấy {loai_hs_xml_text.lower()}.")
+                        status_label.config(text=f"⚠️ Không tìm thấy {loai_hs_xml_text.lower()}.", fg="red")
+                        btn_delete_hs_xml.config(text=f"Xóa {loai_hs_xml_text.lower()}")
+                        dang_xoa_hs_xml = False
                         return
                     continue  # thử lại
 
                 fail_count = 0  # reset nếu bình thường
 
-                if new_count < current_count:
+                if new_count < current_count: # Thấy bảng kết quả và số lượng được giảm đi => Xóa thành công
                     print(f"[DEBUG] Hồ sơ giảm từ {current_count} → {new_count}")
                     # Đóng popup nếu có
                     try:
@@ -402,11 +437,14 @@ def xoa_danh_sach_ho_so_trung():
                         pass
 
                     ghi_log(f"🗑️ Đã xóa hồ sơ: {ho_ten}")
+                    status_label.config(text=f"Còn lại {new_count} {loai_hs_xml_text.lower()}", fg="green")
                     break
             else:
                 ghi_log(f"❌ Xóa hồ sơ {ho_ten} thất bại (số lượng không đổi)")
-                btn_delete_hs_trung.config(text="Xóa HS Trùng")
-                dang_xoa_hs_trung = False
+                status_label.config(text=f"Xóa hồ sơ thất bại - Tạm dừng", fg="red")
+                messagebox.showwarning("Xóa hồ sơ thất bại.")
+                btn_delete_hs_xml.config(text=f"Xóa {loai_hs_xml_text.lower()}")
+                dang_xoa_hs_xml = False
                 return
 
         except Exception as e:
@@ -423,18 +461,19 @@ def xoa_danh_sach_ho_so_trung():
 
 
 
-def toggle_xoa_ho_so_trung():
-    global dang_xoa_hs_trung
+def toggle_xoa_ho_so_xml():
+    global dang_xoa_hs_xml
+    loai_hs_xml_text = combo_loai_hs_xml.get()
 
-    if not dang_xoa_hs_trung:
+    if not dang_xoa_hs_xml:
         # Bắt đầu xóa
-        dang_xoa_hs_trung = True
-        btn_delete_hs_trung.config(text="⏹️ Dừng")
-        xoa_danh_sach_ho_so_trung()
+        dang_xoa_hs_xml = True
+        btn_delete_hs_xml.config(text="⏹️ Dừng")
+        xoa_danh_sach_ho_so_xml()
     else:
         # Dừng thao tác xóa
-        dang_xoa_hs_trung = False
-        btn_delete_hs_trung.config(text="Xóa HS Trùng")
+        dang_xoa_hs_xml = False
+        btn_delete_hs_xml.config(text=f"Xóa {loai_hs_xml_text.lower()}")
 
 
 
@@ -582,8 +621,9 @@ def xoa_tiep_dong_7980():
         dong_hien_tai = start
 
     if dong_hien_tai > end:
-        ghi_log("✅ Đã duyệt hết tất cả các dòng.")
-        status_label.config(text="✅ Đã duyệt hết tất cả các dòng.", fg="blue")
+        ghi_log("✅ Đã duyệt hết danh sách đối chiếu.")
+        status_label.config(text="✅ Đã duyệt hết danh sách đối chiếu.", fg="blue")
+        messagebox.showinfo("Hoàn tất", "✅ Đã duyệt hết danh sách đối chiếu.")
         btn_delete_hs_7980.config(text="Xóa HS 79/80")
         dang_xoa_hs_7980 = False
         return
@@ -631,6 +671,7 @@ def xoa_tiep_dong_7980():
                 time.sleep(0.5)
             else:
                 ghi_log("❌ Lỗi tải trang, không lọc được kết quả")
+                messagebox.showinfo("Lỗi tải trang", "❌ Không lọc được kết quả")
                 btn_delete_hs_7980.config(text="Xóa HS 79/80")
                 dang_xoa_hs_7980 = False
                 return
@@ -654,6 +695,7 @@ def xoa_tiep_dong_7980():
             time.sleep(0.5)
         else:
             ghi_log("❌ Lỗi tải trang, không lọc được kết quả")
+            messagebox.showinfo("Lỗi tải trang", "❌ Không lọc được kết quả")
             btn_delete_hs_7980.config(text="Xóa HS 79/80")
             dang_xoa_hs_7980 = False
             return
@@ -699,6 +741,7 @@ def xoa_tiep_dong_7980():
                             btn_close.click()
                         except:
                             ghi_log(f"{dong_hien_tai}: ❌ xóa {ho_ten} thất bại (không thấy popup xác nhận)")
+                            messagebox.showinfo("Xóa thất bại", "❌ Không có popup xác nhận")
                             dang_xoa_hs_7980 = False
                             btn_delete_hs_7980.config(text="Xóa HS 79/80")
                             return
@@ -728,7 +771,7 @@ def xoa_tiep_dong_7980():
 # Cửa sổ Cài đặt: Đã giải quyết vấn đề hiển thị chính giữa cửa sổ cha và không bị nháy 2 lần
 def mo_cai_dat():
     # --- Tính toán vị trí trước ---
-    w, h = 300, 250
+    w, h = 300, 255
     root.update_idletasks()
     root_x = root.winfo_rootx()
     root_y = root.winfo_rooty()
@@ -796,15 +839,13 @@ def mo_cai_dat():
 
         tk.Button(win, text="Lưu", font=("Arial", 10), width=10, command=luu).pack(pady=20)
         
-        # --- Footer ---
-        tk.Label(win, text="07/2025 - buitiencong@gmail.com", font=("Arial", 8), fg="gray").pack(side="bottom", pady=(5, 5))
+        # --- Footer ---        
+        tk.Label(win, text="Bệnh viện Đa khoa huyện Đan Phượng", font=("Arial", 8), fg="gray").pack(side="bottom", pady=(0, 3))
+        tk.Label(win, text="07/2025 - buitiencong@gmail.com", font=("Arial", 8), fg="gray").pack(side="bottom", pady=(0, 0))
 
         win.deiconify()  # ✅ Hiển thị lại sau khi setup xong
 
     root.after(1, tao_cua_so)
-
-
-
 
 
 
@@ -877,17 +918,39 @@ notebook = ttk.Notebook(notebook_frame, height=300)  # height mặc định ban 
 notebook.pack(fill="x")
 
 # === Tab 1: Hồ sơ trùng ===
-tab_hs_trung = tk.Frame(notebook)
-notebook.add(tab_hs_trung, text="Hồ sơ trùng")
+tab_hs_xml = tk.Frame(notebook)
+notebook.add(tab_hs_xml, text="Hồ sơ XML")
 
-frame_buttons = tk.Frame(tab_hs_trung)  # 👉 Frame chứa các button, căn giữa theo cả 2 chiều
+frame_buttons = tk.Frame(tab_hs_xml)  # 👉 Frame chứa các button, căn giữa theo cả 2 chiều
 frame_buttons.pack(expand=True)
 
-btn_load_hs_trung = tk.Button(frame_buttons, text="Load hồ sơ trùng", font=("Arial", 12), command=load_ho_so_trung)
-btn_load_hs_trung.pack(pady=10)
+# 🆕 Combobox lựa chọn loại hồ sơ
+frame_trang_thai = tk.Frame(frame_buttons)
+frame_trang_thai.pack(pady=(10, 10))
 
-btn_delete_hs_trung = tk.Button(frame_buttons, text="Xóa hồ sơ trùng", font=("Arial", 12), command=toggle_xoa_ho_so_trung)
-btn_delete_hs_trung.pack(pady=10)
+label_loai_hs = tk.Label(frame_trang_thai, text="Trạng thái HS", font=("Arial", 10))
+label_loai_hs.pack(side="left", padx=(0, 5))
+
+loai_hs_var = tk.StringVar()
+combo_loai_hs_xml = ttk.Combobox(frame_trang_thai, textvariable=loai_hs_var, state="readonly", font=("Arial", 11), width=20)
+combo_loai_hs_xml['values'] = ["Hồ sơ đúng", "Hồ sơ trùng", "Hồ sơ cảnh báo", "Hồ sơ lỗi dữ liệu", "Hồ sơ giám định trả về", "Hồ sơ thay thế"]
+combo_loai_hs_xml.current(1) # Mặc định chọn Hồ sơ trùng ở vị trí số 2
+combo_loai_hs_xml.pack(side="left")
+
+btn_load_hs_xml = tk.Button(frame_buttons, text="Load hồ sơ", font=("Arial", 12), command=load_ho_so_xml)
+btn_load_hs_xml.pack(pady=10)
+
+btn_delete_hs_xml = tk.Button(frame_buttons, text="Xóa hồ sơ", font=("Arial", 12), command=toggle_xoa_ho_so_xml)
+btn_delete_hs_xml.pack(pady=10)
+
+# Cập nhật button XML theo loại hồ sơ được chọn
+def cap_nhat_nut_theo_loai_hs(event=None):
+    loai_hs_xml_text = combo_loai_hs_xml.get()
+    btn_load_hs_xml.config(text=f"Load {loai_hs_xml_text.lower()}")
+    btn_delete_hs_xml.config(text=f"Xóa {loai_hs_xml_text.lower()}")
+
+combo_loai_hs_xml.bind("<<ComboboxSelected>>", cap_nhat_nut_theo_loai_hs)
+cap_nhat_nut_theo_loai_hs()  # Thiết lập ban đầu
 
 # === Tab 2: Hồ sơ 79/80 ===
 tab_hs_7980 = tk.Frame(notebook)
@@ -903,8 +966,8 @@ def on_tab_change(event):
     selected_tab = event.widget.select()
     tab_text = notebook.tab(selected_tab, "text")
 
-    if tab_text == "Hồ sơ trùng":
-        notebook.configure(height=120)
+    if tab_text == "Hồ sơ XML":
+        notebook.configure(height=150)
     elif tab_text == "Hồ sơ 79/80":
         notebook.configure(height=200)
 
