@@ -167,10 +167,6 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
             pass  # Không có popup thì bỏ qua
 
         # 2. Click lần lượt các menu theo ID
-        # for menu_id in menu_ids:
-        #     WebDriverWait(browser, 10).until(
-        #         EC.element_to_be_clickable((By.ID, menu_id))
-        #     ).click()
         # --- Kiểm tra nếu menu cấp 3 đã được chọn sẵn (dưới dạng <div>) ---
         menu_id_cap_3 = menu_ids[-1]
         try:
@@ -209,11 +205,81 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
             ).click()
 
         # 4. Chọn tháng từ Combobox giao diện người dùng
-        thang_chon = combo_thang.get()                     # Ví dụ: "Tháng 7"
-        so_thang = int(thang_chon.split()[-1])             # Lấy số 7
-        index_thang = so_thang - 1                         # Index = 6
+        # thang_chon = combo_thang.get()                     # Ví dụ: "Tháng 7"
+        # so_thang = int(thang_chon.split()[-1])             # Lấy số 7
+        # index_thang = so_thang - 1                         # Index = 6
 
-        # --- Kiểm tra nếu đã chọn đúng tháng ---
+        # # --- Kiểm tra nếu đã chọn đúng tháng ---
+        # try:
+        #     selected_thang = browser.find_element(By.ID, "cbx_thang_I").get_attribute("value")
+        #     if str(so_thang) in selected_thang:
+        #         print(f"✅ Tháng {so_thang} đã được chọn sẵn, bỏ qua bước chọn.")
+        #     else:
+        #         # Nếu chưa chọn đúng thì mới thực hiện chọn
+        #         WebDriverWait(browser, 10).until(
+        #             EC.element_to_be_clickable((By.ID, "cbx_thang_I"))
+        #         ).click()
+
+        #         # Đợi dropdown hiển thị ổn định
+        #         WebDriverWait(browser, 5).until(
+        #             EC.visibility_of_element_located((By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0"))
+        #         )
+
+        #         # Thử click vài lần nếu lần đầu không hiệu lực
+        #         for _ in range(3):
+        #             try:
+        #                 browser.find_element(By.ID, f"cbx_thang_DDD_L_LBI{index_thang}T0").click()
+        #                 break
+        #             except Exception:
+        #                 time.sleep(0.3)
+
+        #         # Xác nhận lại tháng sau khi chọn (không bắt buộc)
+        #         selected_again = browser.find_element(By.ID, "cbx_thang_I").get_attribute("value")
+        #         if str(so_thang) not in selected_again:
+        #             print("⚠️ Cảnh báo: Tháng chưa được chọn đúng.")
+        # except Exception as e:
+        #     ghi_log(f"❌ Lỗi khi kiểm tra/chọn tháng: {e}")
+
+        # 4. Chọn Năm và Tháng từ Combobox giao diện người dùng
+
+        # --- Lấy giá trị từ GUI ---
+        thang_chon = combo_thang.get()      # Ví dụ: "Tháng 7"
+        nam_chon = int(combo_nam.get())     # Ví dụ: 2025
+
+        so_thang = int(thang_chon.split()[-1])  # Lấy số 7
+        index_thang = so_thang - 1              # Index = 6
+
+        # --- Chọn Năm ---
+        try:
+            selected_nam = browser.find_element(By.ID, "cbx_nam_I").get_attribute("value")
+            if str(nam_chon) in selected_nam:
+                print(f"✅ Năm {nam_chon} đã được chọn sẵn, bỏ qua bước chọn.")
+            else:
+                # Mở dropdown Năm
+                WebDriverWait(browser, 10).until(
+                    EC.element_to_be_clickable((By.ID, "cbx_nam_I"))
+                ).click()
+
+                # Xác định index của năm cần chọn
+                nam_hien_tai = datetime.datetime.now().year
+                index_nam = nam_hien_tai - nam_chon  # 2025-2025=0, 2025-2024=1,...
+
+                # Đợi dropdown hiển thị
+                WebDriverWait(browser, 5).until(
+                    EC.visibility_of_element_located((By.ID, f"cbx_nam_DDD_L_LBI{index_nam}T0"))
+                )
+
+                # Click chọn năm
+                browser.find_element(By.ID, f"cbx_nam_DDD_L_LBI{index_nam}T0").click()
+
+                # Kiểm tra lại
+                selected_again = browser.find_element(By.ID, "cbx_nam_I").get_attribute("value")
+                if str(nam_chon) not in selected_again:
+                    print("⚠️ Cảnh báo: Năm chưa được chọn đúng.")
+        except Exception as e:
+            ghi_log(f"❌ Lỗi khi kiểm tra/chọn năm: {e}")
+
+        # --- Chọn Tháng ---
         try:
             selected_thang = browser.find_element(By.ID, "cbx_thang_I").get_attribute("value")
             if str(so_thang) in selected_thang:
@@ -243,6 +309,7 @@ def lay_danh_sach_ho_so(menu_ids, combobox_ids, output_var_name, ten_ho_so):
                     print("⚠️ Cảnh báo: Tháng chưa được chọn đúng.")
         except Exception as e:
             ghi_log(f"❌ Lỗi khi kiểm tra/chọn tháng: {e}")
+
 
 
 
@@ -327,7 +394,7 @@ def load_ho_so_7980():
     menu_ids = [
         "HeaderMenu_DXI2_T",         # 🧭 Menu cấp 1: "Hồ sơ đề nghị thanh toán"
         "HeaderMenu_DXI2i1_T",       # 📁 Menu cấp 2: "Hồ sơ 7980"
-        "HeaderMenu_DXI2i1i2_",     # 📋 Menu cấp 3: "Danh sách đề nghị thanh toán 7980a"
+        "HeaderMenu_DXI2i1i2_T",      # 📋 Menu cấp 3: "Danh sách đề nghị thanh toán 7980a"
     ]
     combobox_ids = [
         ("cb_TrangThaiHS_I", "cb_TrangThaiHS_DDD_L_LBI0T0"),  # ✅ Trạng thái hồ sơ: "Tất cả"
@@ -587,6 +654,185 @@ def xoa_ho_so_7980():
 
 
 
+# def xoa_tiep_dong_7980():
+#     import time
+#     global dong_hien_tai, dang_xoa_hs_7980
+
+#     if not dang_xoa_hs_7980:
+#         return
+
+#     # --- Đọc dữ liệu từ file Excel ---
+#     file_path = entry_file_path.get().strip()
+#     if not file_path:
+#         ghi_log("❌ Chưa chọn file Excel.")
+#         status_label.config(text="❌ Chưa chọn file Excel.", fg="red")
+#         return
+
+#     try:
+#         wb = openpyxl.load_workbook(file_path)
+#         ws = wb.active
+#     except Exception as e:
+#         ghi_log(f"❌ Lỗi khi mở file Excel: {e}")
+#         status_label.config(text="❌ Lỗi khi mở file Excel", fg="red")
+#         return
+
+#     try:
+#         start = int(entry_start.get().strip())
+#         end = int(entry_end.get().strip())
+#     except ValueError:
+#         ghi_log("⚠️ Vui lòng nhập số nguyên cho dòng bắt đầu và kết thúc.")
+#         status_label.config(text="⚠️ Vui lòng nhập số nguyên cho dòng bắt đầu và kết thúc.", fg="red")
+#         return
+
+#     if dong_hien_tai is None:
+#         dong_hien_tai = start
+
+#     if dong_hien_tai > end:
+#         ghi_log("✅ Đã duyệt hết danh sách đối chiếu.")
+#         status_label.config(text="✅ Đã duyệt hết danh sách đối chiếu.", fg="blue")
+#         messagebox.showinfo("Hoàn tất", "✅ Đã duyệt hết danh sách đối chiếu.")
+#         btn_delete_hs_7980.config(text="Xóa HS 79/80")
+#         dang_xoa_hs_7980 = False
+#         return
+
+#     try:
+#         # --- Hàm phụ đếm số dòng kết quả ---
+#         def dem_so_dong_ket_qua():
+#             return len(browser.find_elements(By.XPATH, "//tr[starts-with(@id, 'gvDanhSachBHYT7980_DXDataRow')]"))
+
+#         # --- Lấy dữ liệu từ dòng hiện tại ---
+#         ma_the_col = combo_mt.get().strip().upper()
+#         ho_ten_col = combo_ht.get().strip().upper()
+#         ngay_vao_col = combo_nv.get().strip().upper()
+#         ngay_ra_col = combo_nr.get().strip().upper()
+
+#         ma_the_val = ws[f"{ma_the_col}{dong_hien_tai}"].value
+#         ho_ten_val = str(ws[f"{ho_ten_col}{dong_hien_tai}"].value).strip()
+#         ngay_vao_val = str(ws[f"{ngay_vao_col}{dong_hien_tai}"].value).strip()
+#         ngay_ra_val = str(ws[f"{ngay_ra_col}{dong_hien_tai}"].value).strip()
+
+#         if not ma_the_val:
+#             ghi_log(f"{dong_hien_tai}: ⚠️ Không có mã thẻ. Bỏ qua.")
+#             dong_hien_tai += 1
+#             root.after(500, xoa_tiep_dong_7980)
+#             return
+
+#         # --- Tìm lại input mỗi lần để tránh stale element ---
+#         input_box = WebDriverWait(browser, 5).until(
+#             EC.presence_of_element_located((By.ID, "gvDanhSachBHYT7980_DXFREditorcol3_I"))
+#         )
+
+#         input_val = input_box.get_attribute("value").strip()
+
+#         if input_val:
+#             input_box.clear()
+
+#             # --- Chờ số dòng thay đổi sau khi clear ---
+#             old_count = dem_so_dong_ket_qua()
+#             start_time = time.time()
+#             while time.time() - start_time < 30:
+#                 new_count = dem_so_dong_ket_qua()
+#                 if new_count != old_count:
+#                     print(f"Đã lọc thành công {new_count} kết quả")
+#                     break
+#                 time.sleep(0.5)
+#             else:
+#                 ghi_log("❌ Lỗi tải trang, không lọc được kết quả")
+#                 messagebox.showinfo("Lỗi tải trang", "❌ Không lọc được kết quả")
+#                 btn_delete_hs_7980.config(text="Xóa HS 79/80")
+#                 dang_xoa_hs_7980 = False
+#                 return
+
+#             # --- Tìm lại input box sau khi reload ---
+#             input_box = WebDriverWait(browser, 5).until(
+#                 EC.presence_of_element_located((By.ID, "gvDanhSachBHYT7980_DXFREditorcol3_I"))
+#             )
+
+#         # --- Nhập mã thẻ ---
+#         input_box.send_keys(str(ma_the_val))
+
+#         # --- Chờ số dòng thay đổi sau khi nhập mã thẻ ---
+#         old_count = dem_so_dong_ket_qua()
+#         start_time = time.time()
+#         while time.time() - start_time < 10:
+#             new_count = dem_so_dong_ket_qua()
+#             if new_count != old_count:
+#                 print(f"Đã lọc thành công {new_count} kết quả")
+#                 break
+#             time.sleep(0.5)
+#         else:
+#             ghi_log("❌ Lỗi tải trang, không lọc được kết quả")
+#             messagebox.showinfo("Lỗi tải trang", "❌ Không lọc được kết quả")
+#             btn_delete_hs_7980.config(text="Xóa HS 79/80")
+#             dang_xoa_hs_7980 = False
+#             return
+
+#         # --- Tìm danh sách kết quả ---
+#         rows = browser.find_elements(By.XPATH, "//tr[starts-with(@id, 'gvDanhSachBHYT7980_DXDataRow')]")
+#         found = False
+
+#         for row in rows:
+#             cols = row.find_elements(By.TAG_NAME, "td")
+#             if len(cols) >= 19:
+#                 ho_ten = cols[5].text.strip()
+#                 ngay_vao = cols[8].text.strip().replace(" SA", "").replace(" CH", "")
+#                 ngay_ra = cols[9].text.strip().replace(" SA", "").replace(" CH", "")
+
+#                 if ho_ten == ho_ten_val and ngay_vao == ngay_vao_val and ngay_ra == ngay_ra_val:
+#                     try:
+#                         cols = row.find_elements(By.TAG_NAME, "td")
+#                         delete_btn = cols[18].find_element(By.TAG_NAME, "input")
+
+#                         browser.execute_script("arguments[0].click();", delete_btn)
+
+#                         # ⏳ Chờ popup xác nhận xóa hiện ra
+#                         WebDriverWait(browser, 5).until(
+#                             EC.visibility_of_element_located((By.ID, "PopupThongBaoXoa_PWH-1"))
+#                         )
+
+#                         # ✅ Bấm nút "Có"
+#                         btn_co = WebDriverWait(browser, 3).until(
+#                             EC.element_to_be_clickable((By.ID, "btnCo_CD"))
+#                         )
+#                         btn_co.click()
+
+#                         # ⏳ Chờ popup thông báo kết quả xóa (có thể xuất hiện)
+#                         try:
+#                             WebDriverWait(browser, 5).until(
+#                                 EC.visibility_of_element_located((By.ID, "popup_message_PWH-1"))
+#                             )
+#                             # ✅ Bấm nút Close để đóng popup
+#                             btn_close = WebDriverWait(browser, 3).until(
+#                                 EC.element_to_be_clickable((By.ID, "popup_message_HCB-1"))
+#                             )
+#                             btn_close.click()
+#                         except:
+#                             ghi_log(f"{dong_hien_tai}: ❌ xóa {ho_ten} thất bại (không thấy popup xác nhận)")
+#                             messagebox.showinfo("Xóa thất bại", "❌ Không có popup xác nhận")
+#                             dang_xoa_hs_7980 = False
+#                             btn_delete_hs_7980.config(text="Xóa HS 79/80")
+#                             return
+
+#                         ghi_log(f"{dong_hien_tai}: 🗑️ Đã xóa: {ho_ten}")
+#                         found = True
+#                         break
+
+#                     except Exception as e:
+#                         ghi_log(f"{dong_hien_tai}: ❌ Không thể xóa: {e}")
+
+
+#             if not found:
+#                 ghi_log(f"{dong_hien_tai}: ❌ Không tìm thấy hồ sơ của {ho_ten_val}")
+
+
+#     except Exception as e:
+#         ghi_log(f"{dong_hien_tai}: ❌ Lỗi: {e}")
+
+#     dong_hien_tai += 1
+#     root.after(500, xoa_tiep_dong_7980)
+
+
+
 def xoa_tiep_dong_7980():
     import time
     global dong_hien_tai, dang_xoa_hs_7980
@@ -657,6 +903,7 @@ def xoa_tiep_dong_7980():
 
         input_val = input_box.get_attribute("value").strip()
 
+        # ✅ Chỉ clear và chờ thay đổi nếu input đang có dữ liệu
         if input_val:
             input_box.clear()
 
@@ -666,12 +913,12 @@ def xoa_tiep_dong_7980():
             while time.time() - start_time < 30:
                 new_count = dem_so_dong_ket_qua()
                 if new_count != old_count:
-                    print(f"Đã lọc thành công {new_count} kết quả")
+                    print(f"Đã reload thành công {new_count} kết quả")
                     break
                 time.sleep(0.5)
             else:
-                ghi_log("❌ Lỗi tải trang, không lọc được kết quả")
-                messagebox.showinfo("Lỗi tải trang", "❌ Không lọc được kết quả")
+                ghi_log("❌ Lỗi tải trang, không reload được kết quả")
+                messagebox.showinfo("Lỗi tải trang", "❌ Không reload được kết quả")
                 btn_delete_hs_7980.config(text="Xóa HS 79/80")
                 dang_xoa_hs_7980 = False
                 return
@@ -734,7 +981,6 @@ def xoa_tiep_dong_7980():
                             WebDriverWait(browser, 5).until(
                                 EC.visibility_of_element_located((By.ID, "popup_message_PWH-1"))
                             )
-                            # ✅ Bấm nút Close để đóng popup
                             btn_close = WebDriverWait(browser, 3).until(
                                 EC.element_to_be_clickable((By.ID, "popup_message_HCB-1"))
                             )
@@ -749,13 +995,12 @@ def xoa_tiep_dong_7980():
                         ghi_log(f"{dong_hien_tai}: 🗑️ Đã xóa: {ho_ten}")
                         found = True
                         break
-
                     except Exception as e:
                         ghi_log(f"{dong_hien_tai}: ❌ Không thể xóa: {e}")
 
-
+        # ✅ Chỉ ghi log khi không tìm thấy sau khi duyệt hết
         if not found:
-            ghi_log(f"{dong_hien_tai}: ❌ Không tìm thấy hồ sơ của {ho_ten}")
+            ghi_log(f"{dong_hien_tai}: ❌ Không tìm thấy hồ sơ của {ho_ten_val}")
 
     except Exception as e:
         ghi_log(f"{dong_hien_tai}: ❌ Lỗi: {e}")
@@ -767,11 +1012,10 @@ def xoa_tiep_dong_7980():
 
 
 
-
 # Cửa sổ Cài đặt: Đã giải quyết vấn đề hiển thị chính giữa cửa sổ cha và không bị nháy 2 lần
 def mo_cai_dat():
     # --- Tính toán vị trí trước ---
-    w, h = 300, 255
+    w, h = 300, 265
     root.update_idletasks()
     root_x = root.winfo_rootx()
     root_y = root.winfo_rooty()
@@ -893,13 +1137,28 @@ btn_caidat.place(relx=1.0, x=0, y=0, anchor="ne")
 
 
 thang_hien_tai = datetime.datetime.now().month
+nam_hien_tai = datetime.datetime.now().year  # ✅ Lấy năm hiện tại
+
 index_mac_dinh = thang_hien_tai - 1
 
+# --- Frame chứa Tháng và Năm ---
+frame_thang_nam = tk.Frame(root)
+frame_thang_nam.pack(pady=5)
+
+# Combobox Tháng
 selected_thang = tk.StringVar()
-combo_thang = ttk.Combobox(root, textvariable=selected_thang, font=("Arial", 11), width=10, state="readonly")
+combo_thang = ttk.Combobox(frame_thang_nam, textvariable=selected_thang, font=("Arial", 11), width=10, state="readonly")
 combo_thang['values'] = [f"Tháng {i}" for i in range(1, 13)]
 combo_thang.current(index_mac_dinh)
-combo_thang.pack(pady=5)
+combo_thang.pack(side="left", padx=(0, 5))
+
+# Combobox Năm
+selected_nam = tk.StringVar()
+combo_nam = ttk.Combobox(frame_thang_nam, textvariable=selected_nam, font=("Arial", 11), width=6, state="readonly")
+combo_nam['values'] = [str(n) for n in range(nam_hien_tai - 5, nam_hien_tai + 1)]  # ví dụ: 5 năm gần đây
+combo_nam.current(5)  # chọn năm hiện tại
+combo_nam.pack(side="left")
+
 
 # === Notebook chứa 2 tab ===
 style = ttk.Style()
@@ -966,10 +1225,25 @@ def on_tab_change(event):
     selected_tab = event.widget.select()
     tab_text = notebook.tab(selected_tab, "text")
 
+    thang_hien_tai = datetime.datetime.now().month
+    nam_hien_tai = datetime.datetime.now().year
+
     if tab_text == "Hồ sơ XML":
         notebook.configure(height=150)
+        # ✅ Tháng hiện tại
+        combo_thang.current(thang_hien_tai - 1)
+        combo_nam.set(str(nam_hien_tai))
+
     elif tab_text == "Hồ sơ 79/80":
         notebook.configure(height=200)
+        # ✅ Tháng hiện tại - 1
+        thang_truoc = thang_hien_tai - 1
+        nam_hien_tai_2 = nam_hien_tai
+        if thang_truoc == 0:  # Nếu là tháng 1 -> lùi về tháng 12 năm trước
+            thang_truoc = 12
+            nam_hien_tai_2 -= 1
+        combo_thang.current(thang_truoc - 1)
+        combo_nam.set(str(nam_hien_tai_2))
 
 notebook.bind("<<NotebookTabChanged>>", on_tab_change)
 
